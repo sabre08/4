@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스마트폰 시뮬레이터</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* 상단 관리 패널 (편집 모드일 때만 표시) */
+        #admin-panel {
+            background: #333;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        #admin-panel button {
+            padding: 6px 12px;
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        #admin-panel button:hover { background: #005bb5; }
+
+        /* 스마트폰 외형 프레임 */
+        .phone-frame {
+            width: 380px;
+            height: 750px;
+            background: #000;
+            border-radius: 40px;
+            border: 12px solid #333;
+            position: relative;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 스마트폰 내부 화면 */
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            background-size: cover;
+            background-position: center;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px 15px;
+            transition: background 0.3s;
+        }
+
+        /* 상태바 */
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        /* 잠금화면 영역 */
+        .lock-screen-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+            justify-content: center;
+            gap: 20px;
+            z-index: 10;
+        }
+
+        .clock-container {
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+
+        .clock {
+            font-size: 60px;
+            font-weight: 300;
+        }
+
+        .date {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        /* 알림 배지 / 메시지 박스 */
+        .notification-card {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            padding: 12px 18px;
+            border-radius: 16px;
+            width: 90%;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+
+        .notification-title {
+            font-size: 13px;
+            opacity: 0.8;
+            margin-bottom: 3px;
+        }
+
+        .notification-body {
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        /* 패턴 잠금 입력 영역 */
+        .pattern-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            width: 210px;
+            height: 210px;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(5px);
+            padding: 15px;
+            border-radius: 20px;
+        }
+
+        .pattern-dot {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            justify-self: center;
+            align-self: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .pattern-dot.active {
+            background: #007aff;
+            transform: scale(1.2);
+            box-shadow: 0 0 10px #007aff;
+        }
+
+        .pattern-guide {
+            font-size: 13px;
+            opacity: 0.8;
+            text-align: center;
+        }
+
+        /* 홈 화면 (잠금 해제 후) */
+        .home-screen {
+            display: none;
+            flex-direction: column;
+            justify-content: flex-start;
+            flex-grow: 1;
+            z-index: 10;
+            padding-top: 20px;
+        }
+
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            padding: 20px 10px;
+        }
+
+        .app-icon {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+
+        .app-icon-img {
+            width: 55px;
+            height: 55px;
+            background: white;
+            border-radius: 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        .app-icon span {
+            font-size: 12px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* 편집 가능 요소 스타일 (편집모드일 때 표시) */
+        [contenteditable="true"] {
+            border: 1px dashed rgba(255,255,255,0.6);
+            padding: 2px 5px;
+            border-radius: 4px;
+        }
+        [contenteditable="true"]:focus {
+            outline: none;
+            background: rgba(0,0,0,0.3);
+            border-color: #007aff;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 상단 편집/공유 제어 패널 -->
+    <div id="admin-panel">
+        <span id="mode-status">🛠️ [편집 모드] 내용을 자유롭게 수정하세요</span>
+        <button onclick="switchToViewMode()">🔗 공유용 링크 만들기 (보기 전용)</button>
+        <button onclick="resetData()" style="background: #ff3b30;">초기화</button>
+    </div>
+
+    <!-- 스마트폰 본체 -->
+    <div class="phone-frame">
+        <div class="phone-screen" id="phoneScreen">
+            <!-- 상단 상태바 -->
+            <div class="status-bar">
+                <span id="carrierText" contenteditable="true">SK Telecom</span>
+                <span id="batteryText" contenteditable="true">100%</span>
+            </div>
+
+            <!-- 잠금 화면 영역 -->
+            <div class="lock-screen-content" id="lockScreenContent">
+                <div class="clock-container">
+                    <div class="clock" id="clock">11:48</div>
+                    <div class="date" id="dateText" contenteditable="true">4월 3일 화요일</div>
+                </div>
+
+                <div class="notification-card">
+                    <div class="notification-title" id="notifApp" contenteditable="true">새 메시지 63개</div>
+                    <div class="notification-body" id="notifBody" contenteditable="true">잠금 해제 패턴을 그리세요 ✕</div>
+                </div>
+
+                <div class="pattern-container" id="patternBox">
+                    <div class="pattern-dot" data-id="1"></div>
+                    <div class="pattern-dot" data-id="2"></div>
+                    <div class="pattern-dot" data-id="3"></div>
+                    <div class="pattern-dot" data-id="4"></div>
+                    <div class="pattern-dot" data-id="5"></div>
+                    <div class="pattern-dot" data-id="6"></div>
+                    <div class="pattern-dot" data-id="7"></div>
+                    <div class="pattern-dot" data-id="8"></div>
+                    <div class="pattern-dot" data-id="9"></div>
+                </div>
+                <div class="pattern-guide" id="patternGuide">패턴을 연결하여 잠금을 해제하세요 (기본: 1-2-3-5-7-8)</div>
+            </div>
+
+            <!-- 홈 화면 영역 (잠금 해제 후) -->
+            <div class="home-screen" id="homeScreen">
+                <div style="text-align: center; font-size: 24px; font-weight: bold; margin-top: 10px;" id="homeTitle" contenteditable="true">홈 화면</div>
+                <div class="app-grid">
+                    <div class="app-icon" onclick="alert('메시지 앱입니다!')">
+                        <div class="app-icon-img">💬</div>
+                        <span contenteditable="true">메시지</span>
+                    </div>
+                    <div class="app-icon" onclick="alert('사진 앱입니다!')">
+                        <div class="app-icon-img">🖼️</div>
+                        <span contenteditable="true">갤러리</span>
+                    </div>
+                    <div class="app-icon" onclick="alert('설정 앱입니다!')">
+                        <div class="app-icon-img">⚙️</div>
+                        <span contenteditable="true">설정</span>
+                    </div>
+                    <div class="app-icon" onclick="lockPhone()">
+                        <div class="app-icon-img">🔒</div>
+                        <span contenteditable="true">잠금</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 하단 바 영역 -->
+            <div style="text-align: center; font-size: 12px; opacity: 0.6; z-index: 10;">
+                <span contenteditable="true">SWIPE UP TO UNLOCK</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 현재 모드 확인 (URL에 #view가 포함되어 있으면 보기 전용 모드)
+        let isViewMode = window.location.hash === '#view';
+
+        // 페이지 로드시 모드 설정 적용
+        window.onload = function() {
+            loadSavedData();
+            if (isViewMode) {
+                applyViewMode();
+            } else {
+                // 편집 모드일 때 실시간 저장 바인딩
+                setupEditableListeners();
+            }
+            updateClock();
+            setInterval(updateClock, 1000);
+        };
+
+        function updateClock() {
+            const now = new Date();
+            let hours = now.getHours();
+            let minutes = now.getMinutes();
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            document.getElementById('clock').innerText = `${hours}:${minutes}`;
+        }
+
+        // 패턴 잠금 로직
+        const correctPattern = ['1', '2', '3', '5', '7', '8']; // 정답 패턴
+        let currentPattern = [];
+        let isDrawing = false;
+
+        const dots = document.querySelectorAll('.pattern-dot');
+        const patternBox = document.getElementById('patternBox');
+
+        dots.forEach(dot => {
+            dot.addEventListener('mousedown', (e) => startDraw(e, dot));
+            dot.addEventListener('mouseenter', (e) => enterDot(e, dot));
+        });
+
+        window.addEventListener('mouseup', endDraw);
+
+        function startDraw(e, dot) {
+            if (isViewMode && document.getElementById('homeScreen').style.display === 'flex') return;
+            isDrawing = true;
+            currentPattern = [];
+            addDotToPattern(dot);
+        }
+
+        function enterDot(e, dot) {
+            if (!isDrawing) return;
+            addDotToPattern(dot);
+        }
+
+        function addDotToPattern(dot) {
+            const id = dot.getAttribute('data-id');
+            if (!currentPattern.includes(id)) {
+                currentPattern.push(id);
+                dot.classList.add('active');
+            }
+        }
+
+        function endDraw() {
+            if (!isDrawing) return;
+            isDrawing = false;
+
+            // 패턴 검증
+            if (JSON.stringify(currentPattern) === JSON.stringify(correctPattern)) {
+                document.getElementById('patternGuide').innerText = "잠금이 해제되었습니다!";
+                setTimeout(unlockPhone, 400);
+            } else {
+                document.getElementById('patternGuide').innerText = "패턴이 틀렸습니다. 다시 시도하세요.";
+                setTimeout(() => {
+                    dots.forEach(d => d.classList.remove('active'));
+                    document.getElementById('patternGuide').innerText = "패턴을 연결하여 잠금을 해제하세요";
+                    currentPattern = [];
+                }, 600);
+            }
+        }
+
+        function unlockPhone() {
+            document.getElementById('lockScreenContent').style.display = 'none';
+            document.getElementById('homeScreen').style.display = 'flex';
+            dots.forEach(d => d.classList.remove('active'));
+            currentPattern = [];
+        }
+
+        function lockPhone() {
+            document.getElementById('homeScreen').style.display = 'none';
+            document.getElementById('lockScreenContent').style.display = 'flex';
+            document.getElementById('patternGuide').innerText = "패턴을 연결하여 잠금을 해제하세요";
+        }
+
+        // --- 편집 및 보기 모드 전환 관련 기능 ---
+        function setupEditableListeners() {
+            const editables = document.querySelectorAll('[contenteditable="true"]');
+            editables.forEach(el => {
+                el.addEventListener('input', () => {
+                    saveData();
+                });
+            });
+        }
+
+        function saveData() {
+            const data = {
+                carrier: document.getElementById('carrierText').innerText,
+                battery: document.getElementById('batteryText').innerText,
+                dateText: document.getElementById('dateText').innerText,
+                notifApp: document.getElementById('notifApp').innerText,
+                notifBody: document.getElementById('notifBody').innerText,
+                homeTitle: document.getElementById('homeTitle').innerText,
+            };
+            localStorage.setItem('phoneSimData', JSON.stringify(data));
+        }
+
+        function loadSavedData() {
+            const saved = localStorage.getItem('phoneSimData');
+            if (saved) {
+                const data = JSON.parse(saved);
+                if(document.getElementById('carrierText')) document.getElementById('carrierText').innerText = data.carrier;
+                if(document.getElementById('batteryText')) document.getElementById('batteryText').innerText = data.battery;
+                if(document.getElementById('dateText')) document.getElementById('dateText').innerText = data.dateText;
+                if(document.getElementById('notifApp')) document.getElementById('notifApp').innerText = data.notifApp;
+                if(document.getElementById('notifBody')) document.getElementById('notifBody').innerText = data.notifBody;
+                if(document.getElementById('homeTitle')) document.getElementById('homeTitle').innerText = data.homeTitle;
+            }
+        }
+
+        function switchToViewMode() {
+            saveData();
+            // 현재 주소에 #view 붙여서 이동
+            window.location.href = window.location.pathname + '#view';
+            location.reload();
+        }
+
+        function applyViewMode() {
+            // 상단 관리 패널 숨기기
+            document.getElementById('admin-panel').style.display = 'none';
+            // contenteditable 속성 제거
+            const editables = document.querySelectorAll('[contenteditable="true"]');
+            editables.forEach(el => el.removeAttribute('contenteditable'));
+        }
+
+        function resetData() {
+            if (confirm('모든 내용을 초기화하시겠습니까?')) {
+                localStorage.removeItem('phoneSimData');
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
